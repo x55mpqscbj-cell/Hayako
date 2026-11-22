@@ -1,0 +1,2790 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>EcoRuta RD • Logística Inteligente de Recolección (Santiago)</title>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Tipografía Apple: SF Pro / Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ========================================================
+       SISTEMA DE DISEÑO APPLE (iOS / macOS Human Interface Guidelines)
+       - Vidrio Esmerilado Profundo (Frosted Glassmorphism 32px)
+       - Curvas squircle continuas (border-radius: 14px-30px)
+       - Paleta de acentos Apple: Esmeralda, Azul Royal, Ámbar, Grafito
+       - Microinteracciones elásticas y dinámicas
+       ======================================================== */
+    :root {
+      --apple-bg: #E5E5EA;
+      --apple-card: rgba(255, 255, 255, 0.88);
+      --apple-card-border: rgba(255, 255, 255, 0.85);
+      --apple-border-subtle: rgba(0, 0, 0, 0.08);
+      
+      --apple-text-primary: #1D1D1F;
+      --apple-text-secondary: #86868B;
+      --apple-text-tertiary: #A1A1A6;
+      
+      --apple-blue: #0071E3;
+      --apple-blue-rgb: 0, 113, 227;
+      --apple-green: #34C759;
+      --apple-green-rgb: 52, 199, 89;
+      --apple-amber: #FF9500;
+      --apple-red: #FF3B30;
+      --apple-purple: #AF52DE;
+      
+      --shadow-apple-soft: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+      --shadow-apple-float: 0 20px 48px -12px rgba(0, 0, 0, 0.18), 0 0 1px 1px rgba(255, 255, 255, 0.9) inset;
+      
+      --spring-physics: cubic-bezier(0.16, 1, 0.3, 1);
+      --spring-press: cubic-bezier(0.25, 1, 0.5, 1);
+      --radius-sm: 14px;
+      --radius-md: 20px;
+      --radius-lg: 26px;
+      --radius-pill: 9999px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #D1D1D6;
+      position: relative;
+    }
+
+    /* CONTENEDOR DEL MAPA (FONDO COMPLETO) */
+    #mapa {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      background: #E5E5EA;
+    }
+
+    /* VIDRIO ESMERILADO APPLE */
+    .glass-panel {
+      background: var(--apple-card);
+      backdrop-filter: blur(36px) saturate(200%);
+      -webkit-backdrop-filter: blur(36px) saturate(200%);
+      border: 1px solid var(--apple-card-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-apple-float);
+      transition: all 0.35s var(--spring-physics);
+    }
+
+    /* ========================================================
+       TOP BAR FLOTANTE / ISLA DINÁMICA & SECTORES
+       ======================================================== */
+    .top-bar-container {
+      position: absolute;
+      top: 16px;
+      left: 18px;
+      right: 18px;
+      z-index: 1100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      gap: 12px;
+      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease, filter 0.35s ease;
+    }
+
+    .top-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+      max-width: 100%;
+    }
+
+    /* ISLA DINÁMICA APPLE */
+    .dynamic-island {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 18px;
+      background: rgba(29, 29, 31, 0.92);
+      backdrop-filter: blur(35px) saturate(200%);
+      -webkit-backdrop-filter: blur(35px) saturate(200%);
+      color: #FFFFFF;
+      border-radius: var(--radius-pill);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.3s var(--spring-physics);
+      flex-shrink: 0;
+    }
+
+    .dynamic-island:hover {
+      transform: scale(1.02);
+      background: #1D1D1F;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--apple-green);
+      box-shadow: 0 0 0 0 rgba(var(--apple-green-rgb), 0.7);
+      animation: pulse-ring 2s infinite cubic-bezier(0.66, 0, 0, 1);
+    }
+
+    .pulse-dot.retrasado {
+      background: var(--apple-amber);
+      box-shadow: 0 0 0 0 rgba(255, 149, 0, 0.7);
+    }
+
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(var(--apple-green-rgb), 0.7); }
+      70% { box-shadow: 0 0 0 9px rgba(var(--apple-green-rgb), 0); }
+      100% { box-shadow: 0 0 0 0 rgba(var(--apple-green-rgb), 0); }
+    }
+
+    /* SELECTOR DE SECTORES / FLOTA TIPO CAPSULA APPLE */
+    .fleet-selector-bar {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 6px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      border-radius: var(--radius-pill);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      pointer-events: auto;
+    }
+
+    .fleet-selector-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .fleet-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      border: none;
+      background: transparent;
+      color: var(--apple-text-secondary);
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.25s var(--spring-press);
+      user-select: none;
+    }
+
+    .fleet-chip:hover {
+      color: var(--apple-text-primary);
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .fleet-chip.active {
+      background: #FFFFFF;
+      color: var(--apple-text-primary);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .fleet-chip .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--apple-green);
+      opacity: 0.6;
+    }
+
+    .fleet-chip.active .chip-dot {
+      opacity: 1;
+      box-shadow: 0 0 6px rgba(var(--apple-green-rgb), 0.8);
+    }
+
+    /* CONTROL DE CAPAS DEL MAPA (ARRIBA DERECHA) */
+    .map-layer-switch {
+      position: absolute;
+      top: 0;
+      right: 0;
+      display: flex;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      padding: 4px;
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-apple-soft);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      gap: 3px;
+      pointer-events: auto;
+    }
+
+    .layer-btn {
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      color: var(--apple-text-secondary);
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .layer-btn.active {
+      background: #FFFFFF;
+      color: var(--apple-text-primary);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    /* ========================================================
+       PANEL PRINCIPAL / HOJA DESLIZABLE NATIVA APPLE (DESKTOP & CELL)
+       ======================================================== */
+    .floating-card-left {
+      position: absolute;
+      top: 76px;
+      left: 18px;
+      width: 410px;
+      max-height: calc(100vh - 170px);
+      z-index: 1200;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 26px;
+      box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.2), 0 0 1px 1px rgba(255, 255, 255, 0.9) inset;
+      transition: transform 0.4s var(--spring-physics), max-height 0.4s var(--spring-physics), opacity 0.3s ease;
+    }
+
+    /* ESTADOS DE TAMAÑO / SNAP SIZES */
+    /* 1. PEEK / MINI BARRA */
+    .floating-card-left.card-snap-peek {
+      max-height: 80px !important;
+      overflow: hidden !important;
+    }
+    .floating-card-left.card-snap-peek .card-body {
+      display: none !important;
+    }
+    .floating-card-left.card-snap-peek .card-peek-summary {
+      display: flex !important;
+    }
+
+    /* 2. MID / NORMAL */
+    .floating-card-left.card-snap-mid {
+      max-height: 520px;
+    }
+
+    /* 3. FULL / EXPANDIDO */
+    .floating-card-left.card-snap-full {
+      max-height: calc(100vh - 120px);
+    }
+
+    /* 4. HIDDEN / OCULTO */
+    .floating-card-left.card-snap-hidden {
+      transform: translateX(calc(-100% - 40px)) scale(0.92);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* MANIJA TÁCTIL (PULL HANDLE) */
+    .apple-sheet-handle {
+      width: 42px;
+      height: 5px;
+      background: rgba(0, 0, 0, 0.22);
+      border-radius: 3px;
+      margin: 8px auto 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .apple-sheet-handle:hover {
+      background: rgba(0, 0, 0, 0.45);
+      transform: scaleX(1.2);
+    }
+
+    .card-header {
+      padding: 10px 18px 12px;
+      border-bottom: 1px solid var(--apple-border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+      cursor: pointer;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--apple-text-primary);
+    }
+
+    .apple-select-mini {
+      background: rgba(0, 0, 0, 0.05);
+      border: 1px solid var(--apple-border-subtle);
+      border-radius: var(--radius-pill);
+      padding: 5px 10px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--apple-text-primary);
+      outline: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .apple-select-mini:hover {
+      background: rgba(0, 0, 0, 0.09);
+    }
+
+    .apple-icon-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--apple-text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      transition: all 0.2s var(--spring-press);
+    }
+
+    .apple-icon-btn:hover {
+      background: rgba(0, 0, 0, 0.12);
+      color: var(--apple-text-primary);
+    }
+
+    .apple-icon-btn:active {
+      transform: scale(0.92);
+    }
+
+    .card-body {
+      padding: 16px 18px 22px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card-body::-webkit-scrollbar {
+      width: 4px;
+    }
+    .card-body::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 4px;
+    }
+
+    /* BOTÓN CÁPSULA RESCATE (CUANDO EL PANEL ESTÁ OCULTO) */
+    .apple-rescue-pill {
+      position: absolute;
+      bottom: 84px;
+      left: 18px;
+      z-index: 1250;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: rgba(29, 29, 31, 0.94);
+      backdrop-filter: blur(35px) saturate(200%);
+      -webkit-backdrop-filter: blur(35px) saturate(200%);
+      color: #FFFFFF;
+      border-radius: var(--radius-pill);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+      font-size: 13px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: all 0.25s var(--spring-press);
+    }
+
+    .apple-rescue-pill:hover {
+      transform: scale(1.03);
+      background: #1D1D1F;
+    }
+
+    .apple-rescue-pill:active {
+      transform: scale(0.96);
+    }
+
+    .apple-rescue-pill.visible {
+      display: flex;
+      animation: slideInRescue 0.35s var(--spring-physics) forwards;
+    }
+
+    @keyframes slideInRescue {
+      from { opacity: 0; transform: translateY(15px) scale(0.9); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* AUTO-OCULTAR SUTIL AL ARRASTRAR EL MAPA */
+    body.mapa-interactuando .floating-card-left:not(:hover) {
+      opacity: 0.25;
+      filter: blur(1px);
+      pointer-events: none;
+    }
+
+    /* WIDGETS MÉTRICAS */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .metric-tile {
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid var(--apple-border-subtle);
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--apple-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--apple-text-primary);
+    }
+
+    .metric-sub {
+      font-size: 11px;
+      color: var(--apple-green);
+      font-weight: 600;
+    }
+
+    /* ANILLO DE CARGA TIPO APPLE WATCH */
+    .gauge-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.75);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--apple-border-subtle);
+    }
+
+    .ring-svg {
+      width: 68px;
+      height: 68px;
+      transform: rotate(-90deg);
+      flex-shrink: 0;
+    }
+
+    .ring-bg {
+      fill: none;
+      stroke: rgba(0, 0, 0, 0.07);
+      stroke-width: 6;
+    }
+
+    .ring-fill {
+      fill: none;
+      stroke: var(--apple-green);
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 157;
+      stroke-dashoffset: 157;
+      transition: stroke-dashoffset 0.8s var(--spring-physics), stroke 0.4s ease;
+    }
+
+    .ring-text-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    /* BOTONES PRIMARIOS Y SECUNDARIOS APPLE */
+    .btn-apple {
+      width: 100%;
+      padding: 13px 18px;
+      border-radius: var(--radius-pill);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.25s var(--spring-press);
+    }
+
+    .btn-apple:hover {
+      transform: scale(1.015);
+      filter: brightness(1.05);
+    }
+
+    .btn-apple:active {
+      transform: scale(0.97);
+    }
+
+    .btn-apple-primary {
+      background: var(--apple-blue);
+      color: #FFFFFF;
+      box-shadow: 0 4px 16px rgba(var(--apple-blue-rgb), 0.35);
+    }
+
+    .btn-apple-secondary {
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--apple-text-primary);
+    }
+
+    .btn-apple-green {
+      background: var(--apple-green);
+      color: #FFFFFF;
+      box-shadow: 0 4px 16px rgba(var(--apple-green-rgb), 0.35);
+    }
+
+    /* CONTROLES DE SIMULACIÓN */
+    .sim-controls-bar {
+      display: flex;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.04);
+      padding: 5px;
+      border-radius: var(--radius-pill);
+      justify-content: space-between;
+    }
+
+    .sim-btn {
+      flex: 1;
+      padding: 7px 5px;
+      border-radius: var(--radius-pill);
+      border: none;
+      background: transparent;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--apple-text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .sim-btn:hover {
+      background: #FFFFFF;
+      color: var(--apple-text-primary);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    /* SLIDER APPLE */
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid var(--apple-border-subtle);
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .apple-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(0, 0, 0, 0.1);
+      outline: none;
+    }
+
+    .apple-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+      cursor: pointer;
+      border: 0.5px solid rgba(0, 0, 0, 0.06);
+      transition: transform 0.15s ease;
+    }
+
+    .apple-range::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    /* CARPLAY DRIVER CARDS */
+    .driver-next-card {
+      background: #1D1D1F;
+      color: #FFFFFF;
+      padding: 18px;
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.25);
+    }
+
+    .driver-badge {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: var(--apple-green);
+      background: rgba(52, 199, 89, 0.15);
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+    }
+
+    .driver-target-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .driver-target-action {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.4;
+    }
+
+    .driver-stats-strip {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding-top: 12px;
+      margin-top: 4px;
+    }
+
+    .driver-strip-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .driver-strip-item span {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .driver-strip-item strong {
+      font-size: 16px;
+      font-weight: 800;
+      color: #FFFFFF;
+    }
+
+    /* LISTA DE PARADAS */
+    .stop-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stop-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid var(--apple-border-subtle);
+      border-radius: var(--radius-md);
+      transition: all 0.2s ease;
+    }
+
+    .stop-item.active {
+      border-color: var(--apple-blue);
+      background: rgba(0, 113, 227, 0.08);
+      box-shadow: 0 4px 12px rgba(var(--apple-blue-rgb), 0.12);
+    }
+
+    .stop-item.completed {
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+
+    .stop-number {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.08);
+      color: var(--apple-text-primary);
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stop-item.active .stop-number {
+      background: var(--apple-blue);
+      color: #FFFFFF;
+    }
+
+    .stop-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .stop-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--apple-text-primary);
+    }
+
+    .stop-detail {
+      font-size: 11px;
+      color: var(--apple-text-secondary);
+    }
+
+    /* EXPLICADOR ALGORITMOS */
+    .algo-explainer-card {
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid var(--apple-border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .algo-title-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .algo-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .algo-icon-dijkstra { background: rgba(0, 113, 227, 0.15); color: var(--apple-blue); }
+    .algo-icon-mochila { background: rgba(175, 82, 222, 0.15); color: var(--apple-purple); }
+    .algo-icon-distancia { background: rgba(52, 199, 89, 0.15); color: var(--apple-green); }
+
+    .algo-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--apple-text-primary);
+    }
+
+    .algo-desc {
+      font-size: 12.5px;
+      color: var(--apple-text-secondary);
+      line-height: 1.5;
+    }
+
+    .algo-formula {
+      background: rgba(0, 0, 0, 0.04);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      color: var(--apple-text-primary);
+    }
+
+    /* MARCADORES LEAFLET */
+    .truck-marker-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #1D1D1F;
+      color: #FFFFFF;
+      font-size: 22px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 4px rgba(255, 255, 255, 0.95);
+      position: relative;
+      cursor: pointer;
+    }
+
+    .truck-marker-icon.active-truck {
+      background: var(--apple-blue);
+      box-shadow: 0 8px 24px rgba(var(--apple-blue-rgb), 0.5), 0 0 0 4px #FFFFFF;
+    }
+
+    .truck-radar {
+      position: absolute;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(var(--apple-green-rgb), 0.25);
+      animation: radar-wave 2s infinite ease-out;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    @keyframes radar-wave {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    .sector-pin {
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border-radius: var(--radius-pill);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--apple-text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .sector-pin.high { border-left: 4px solid var(--apple-red); }
+    .sector-pin.med { border-left: 4px solid var(--apple-amber); }
+    .sector-pin.low { border-left: 4px solid var(--apple-green); }
+
+    .base-pin {
+      padding: 7px 14px;
+      background: var(--apple-blue);
+      color: #FFFFFF;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      font-weight: 700;
+      box-shadow: 0 6px 18px rgba(var(--apple-blue-rgb), 0.4);
+      white-space: nowrap;
+    }
+
+    .rafey-pin {
+      padding: 7px 14px;
+      background: var(--apple-green);
+      color: #FFFFFF;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      font-weight: 700;
+      box-shadow: 0 6px 18px rgba(var(--apple-green-rgb), 0.4);
+      white-space: nowrap;
+    }
+
+    /* ========================================================
+       SISTEMA TOAST APPLE
+       ======================================================== */
+    .apple-toast-container {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+      max-width: 90vw;
+    }
+
+    .apple-toast-item {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 18px;
+      background: rgba(29, 29, 31, 0.94);
+      backdrop-filter: blur(35px) saturate(200%);
+      -webkit-backdrop-filter: blur(35px) saturate(200%);
+      color: #FFFFFF;
+      border-radius: var(--radius-pill);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      transform: translateY(-20px) scale(0.92);
+      opacity: 0;
+      transition: all 0.35s var(--spring-physics);
+      cursor: pointer;
+    }
+
+    .apple-toast-item.visible {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+
+    .apple-toast-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .apple-toast-item.success .apple-toast-icon { background: var(--apple-green); color: #FFF; }
+    .apple-toast-item.warning .apple-toast-icon { background: var(--apple-amber); color: #FFF; }
+    .apple-toast-item.error .apple-toast-icon { background: var(--apple-red); color: #FFF; }
+    .apple-toast-item.info .apple-toast-icon { background: var(--apple-blue); color: #FFF; }
+
+    .apple-toast-close {
+      opacity: 0.5;
+      font-size: 12px;
+      margin-left: 6px;
+      transition: opacity 0.2s;
+    }
+    .apple-toast-item:hover .apple-toast-close { opacity: 1; }
+
+    /* ========================================================
+       SISTEMA MODAL APPLE
+       ======================================================== */
+    .apple-modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 3500;
+      background: rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .apple-modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .apple-modal-card {
+      width: 90%;
+      max-width: 440px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(36px) saturate(190%);
+      -webkit-backdrop-filter: blur(36px) saturate(190%);
+      border-radius: 26px;
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28), 0 0 1px 1px rgba(255, 255, 255, 0.9) inset;
+      padding: 26px;
+      text-align: center;
+      transform: scale(0.92) translateY(12px);
+      transition: all 0.35s var(--spring-physics);
+    }
+
+    .apple-modal-overlay.active .apple-modal-card {
+      transform: scale(1) translateY(0);
+    }
+
+    .apple-modal-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 20px;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      background: rgba(0, 113, 227, 0.12);
+      color: var(--apple-blue);
+    }
+
+    .apple-modal-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--apple-text-primary);
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .apple-modal-body {
+      font-size: 14px;
+      color: var(--apple-text-secondary);
+      line-height: 1.5;
+      margin-bottom: 22px;
+    }
+
+    .apple-modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .apple-modal-actions button {
+      flex: 1;
+    }
+
+    /* ========================================================
+       SISTEMA TOOLTIP APPLE
+       ======================================================== */
+    [data-apple-tooltip] {
+      position: relative;
+    }
+
+    [data-apple-tooltip]::after {
+      content: attr(data-apple-tooltip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px) scale(0.95);
+      background: rgba(29, 29, 31, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      color: #FFFFFF;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      transition: all 0.2s var(--spring-physics);
+      z-index: 5000;
+    }
+
+    [data-apple-tooltip]::before {
+      content: "";
+      position: absolute;
+      bottom: calc(100% + 2px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      border: 5px solid transparent;
+      border-top-color: rgba(29, 29, 31, 0.95);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s var(--spring-physics);
+      z-index: 5000;
+    }
+
+    [data-apple-tooltip]:hover::after,
+    [data-apple-tooltip]:hover::before {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    /* ========================================================
+       SISTEMA SKELETON LOADER APPLE (SHIMMER)
+       ======================================================== */
+    .skeleton-box {
+      display: inline-block;
+      width: 100%;
+      background: linear-gradient(90deg, rgba(0, 0, 0, 0.05) 25%, rgba(0, 0, 0, 0.12) 37%, rgba(0, 0, 0, 0.05) 63%);
+      background-size: 400% 100%;
+      animation: apple-skeleton-shimmer 1.5s ease-in-out infinite;
+      border-radius: 8px;
+    }
+
+    @keyframes apple-skeleton-shimmer {
+      0% { background-position: 100% 50%; }
+      100% { background-position: 0 50%; }
+    }
+
+    .skeleton-text {
+      height: 14px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+    }
+    .skeleton-text.sm { height: 10px; width: 60%; }
+    .skeleton-text.md { height: 16px; width: 85%; }
+    .skeleton-text.lg { height: 22px; width: 95%; }
+
+    /* ========================================================
+       SISTEMA DE BADGES APPLE
+       ======================================================== */
+    .apple-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      padding: 3px 9px;
+      border-radius: var(--radius-pill);
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--apple-text-secondary);
+      white-space: nowrap;
+    }
+
+    .apple-badge-green { background: rgba(52, 199, 89, 0.15); color: var(--apple-green); border: 1px solid rgba(52, 199, 89, 0.25); }
+    .apple-badge-blue { background: rgba(0, 113, 227, 0.15); color: var(--apple-blue); border: 1px solid rgba(0, 113, 227, 0.25); }
+    .apple-badge-amber { background: rgba(255, 149, 0, 0.15); color: var(--apple-amber); border: 1px solid rgba(255, 149, 0, 0.25); }
+    .apple-badge-red { background: rgba(255, 59, 48, 0.15); color: var(--apple-red); border: 1px solid rgba(255, 59, 48, 0.25); }
+    .apple-badge-purple { background: rgba(175, 82, 222, 0.15); color: var(--apple-purple); border: 1px solid rgba(175, 82, 222, 0.25); }
+
+    .apple-badge-count {
+      position: absolute;
+      top: -3px;
+      right: -5px;
+      background: var(--apple-red);
+      color: #FFFFFF;
+      font-size: 10px;
+      font-weight: 800;
+      min-width: 17px;
+      height: 17px;
+      padding: 0 4px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(255, 59, 48, 0.4);
+    }
+
+    /* ========================================================
+       BARRA INFERIOR DE PESTAÑAS (ÚNICA BARRA DE NAVEGACIÓN)
+       ======================================================== */
+    .apple-tab-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.90);
+      backdrop-filter: blur(34px) saturate(200%);
+      -webkit-backdrop-filter: blur(34px) saturate(200%);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      border-radius: var(--radius-pill);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 1px 1px rgba(255, 255, 255, 0.85) inset;
+      transition: all 0.35s var(--spring-physics);
+    }
+
+    .apple-tab-bar.tab-bar-hidden {
+      transform: translateX(-50%) translateY(140%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .apple-tab-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 6px 14px;
+      border: none;
+      background: transparent;
+      color: var(--apple-text-secondary);
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.25s var(--spring-press);
+      user-select: none;
+    }
+
+    .apple-tab-item svg {
+      width: 20px;
+      height: 20px;
+      stroke-width: 2.2;
+    }
+
+    .apple-tab-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .apple-tab-item.active {
+      background: rgba(0, 113, 227, 0.12);
+      color: var(--apple-blue);
+    }
+
+    .apple-tab-item:active {
+      transform: scale(0.92);
+    }
+
+    /* ========================================================
+       ONBOARDING MODAL APPLE KEYNOTE
+       ======================================================== */
+    .onboarding-card {
+      width: 90%;
+      max-width: 490px;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(40px) saturate(200%);
+      -webkit-backdrop-filter: blur(40px) saturate(200%);
+      border-radius: 32px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      padding: 34px 28px 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .onboarding-slide {
+      display: none;
+      animation: fadeInSlide 0.35s var(--spring-physics) forwards;
+    }
+
+    .onboarding-slide.active {
+      display: block;
+    }
+
+    @keyframes fadeInSlide {
+      from { opacity: 0; transform: translateX(20px) scale(0.97); }
+      to { opacity: 1; transform: translateX(0) scale(1); }
+    }
+
+    .onboarding-icon-banner {
+      width: 80px;
+      height: 80px;
+      border-radius: 26px;
+      margin: 0 auto 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      background: linear-gradient(135deg, rgba(0, 113, 227, 0.15), rgba(52, 199, 89, 0.2));
+      box-shadow: 0 10px 24px rgba(0, 113, 227, 0.15);
+    }
+
+    .onboarding-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--apple-text-primary);
+      margin-bottom: 10px;
+    }
+
+    .onboarding-desc {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--apple-text-secondary);
+      margin-bottom: 24px;
+    }
+
+    .onboarding-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .onboarding-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.15);
+      transition: all 0.3s var(--spring-physics);
+      cursor: pointer;
+    }
+
+    .onboarding-dot.active {
+      width: 24px;
+      border-radius: 4px;
+      background: var(--apple-blue);
+    }
+
+    .onboarding-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ========================================================
+       FAB (FLOATING ACTION BUTTON CON SPEED DIAL)
+       ======================================================== */
+    .apple-fab-container {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      z-index: 1600;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .apple-fab-main {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: var(--apple-blue);
+      color: #FFFFFF;
+      border: none;
+      box-shadow: 0 12px 30px rgba(var(--apple-blue-rgb), 0.45), 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s var(--spring-press);
+    }
+
+    .apple-fab-main:hover {
+      transform: scale(1.06);
+      background: #0077ED;
+    }
+
+    .apple-fab-main:active {
+      transform: scale(0.92);
+    }
+
+    .apple-fab-main svg {
+      width: 24px;
+      height: 24px;
+      transition: transform 0.3s var(--spring-physics);
+    }
+
+    .apple-fab-container.open .apple-fab-main svg {
+      transform: rotate(45deg);
+    }
+
+    .apple-fab-menu {
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(15px) scale(0.85);
+      transition: all 0.3s var(--spring-physics);
+    }
+
+    .apple-fab-container.open .apple-fab-menu {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+
+    .apple-fab-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+      color: var(--apple-text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.25s var(--spring-press);
+      font-size: 18px;
+    }
+
+    .apple-fab-btn:hover {
+      transform: scale(1.1);
+      background: #FFFFFF;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+    }
+
+    .apple-fab-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* ========================================================
+       RESPONSIVE & NATIVO PARA CELULARES (SMARTPHONES)
+       ======================================================== */
+    @media (max-width: 820px) {
+      .top-bar-container {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+
+      .top-bar-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .dynamic-island {
+        padding: 8px 14px;
+        font-size: 12px;
+      }
+
+      .fleet-selector-bar {
+        max-width: calc(100vw - 160px);
+        flex: 1;
+        padding: 3px 5px;
+      }
+
+      .fleet-chip {
+        padding: 5px 11px;
+        font-size: 11.5px;
+      }
+
+      .map-layer-switch {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        padding: 3px;
+        z-index: 1150;
+      }
+
+      .layer-btn {
+        padding: 5px 9px;
+        font-size: 10px;
+      }
+
+      /* HOJA DESLIZABLE NATIVA (APPLE BOTTOM SHEET) EN CELULARES */
+      .floating-card-left {
+        top: auto;
+        left: 10px;
+        right: 10px;
+        bottom: 74px;
+        width: auto;
+        border-radius: 26px;
+        box-shadow: 0 -8px 36px rgba(0, 0, 0, 0.2), 0 0 1px 1px rgba(255, 255, 255, 0.9) inset;
+      }
+
+      .floating-card-left.card-snap-peek {
+        max-height: 74px !important;
+        bottom: 74px;
+      }
+
+      .floating-card-left.card-snap-mid {
+        max-height: 46vh !important;
+        bottom: 74px;
+      }
+
+      .floating-card-left.card-snap-full {
+        max-height: 84vh !important;
+        bottom: 12px;
+        z-index: 1700;
+      }
+
+      .floating-card-left.card-snap-hidden {
+        transform: translateY(120%) scale(0.95);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .apple-tab-bar {
+        bottom: 12px;
+        padding: 4px 8px;
+        gap: 3px;
+      }
+
+      .apple-tab-item {
+        padding: 5px 10px;
+      }
+
+      .apple-tab-item svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .apple-tab-label {
+        font-size: 10px;
+      }
+
+      .apple-fab-container {
+        bottom: 78px;
+        right: 14px;
+      }
+
+      .apple-rescue-pill {
+        bottom: 78px;
+        left: 14px;
+        padding: 8px 14px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MAPA PRINCIPAL DE FONDO -->
+  <div id="mapa"></div>
+
+  <!-- SISTEMA TOAST FLOTANTE -->
+  <div class="apple-toast-container" id="toast-container"></div>
+
+  <!-- BOTÓN CÁPSULA RESCATE (RESTAURAR PANEL) -->
+  <button class="apple-rescue-pill" id="btn-rescue-panel" onclick="setTamanoPanel('mid')" data-apple-tooltip="Restaurar panel del camión">
+    <span class="pulse-dot"></span>
+    <span id="texto-rescue-pill">🚛 #1 Los Jardines • Mostrar</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+  </button>
+
+  <!-- BARRA SUPERIOR DINÁMICA & SECTORES -->
+  <div class="top-bar-container">
+    <div class="top-bar-left">
+      <!-- Isla Dinámica -->
+      <div class="dynamic-island" onclick="ciclarTamanoPanel()" title="Toca para expandir o contraer panel">
+        <span class="pulse-dot" id="indicador-live"></span>
+        <span id="texto-estado-camion">Santiago • Flota Conectada</span>
+        <span style="opacity: 0.35;">|</span>
+        <span id="reloj-act" style="font-weight: 500; font-size: 12px;">--:--:--</span>
+      </div>
+
+      <!-- Selector de Flota Activa (Camiones #1 a #4 en Sectores) -->
+      <div class="fleet-selector-bar" id="barra-seleccion-flota">
+        <button class="fleet-chip active" id="chip-camion-1" onclick="seleccionarCamion(1)" data-apple-tooltip="Sector Los Jardines (Centro)">
+          <span class="chip-dot"></span> 🚛 #1 Jardines
+        </button>
+        <button class="fleet-chip" id="chip-camion-2" onclick="seleccionarCamion(2)" data-apple-tooltip="Sector Cienfuegos (Oeste)">
+          <span class="chip-dot"></span> 🚛 #2 Cienfuegos
+        </button>
+        <button class="fleet-chip" id="chip-camion-3" onclick="seleccionarCamion(3)" data-apple-tooltip="Sector Pekín (Sur)">
+          <span class="chip-dot"></span> 🚛 #3 Pekín
+        </button>
+        <button class="fleet-chip" id="chip-camion-4" onclick="seleccionarCamion(4)" data-apple-tooltip="Sector Reparto del Este">
+          <span class="chip-dot"></span> 🚛 #4 Reparto
+        </button>
+      </div>
+    </div>
+
+    <!-- Control de Capas de Mapa (Situado arriba a la derecha, sin duplicaciones) -->
+    <div class="map-layer-switch">
+      <button class="layer-btn active" id="btn-layer-osm" onclick="cambiarCapaMapa('osm')">🗺️ Normal</button>
+      <button class="layer-btn" id="btn-layer-carto" onclick="cambiarCapaMapa('carto')">🏙️ Limpio</button>
+      <button class="layer-btn" id="btn-layer-satelite" onclick="cambiarCapaMapa('satelite')">🛰️ Satélite</button>
+    </div>
+  </div>
+
+  <!-- PANEL PRINCIPAL TIPO HOJA NATIVA APPLE (DESKTOP & CELL) -->
+  <div class="glass-panel floating-card-left card-snap-mid" id="panel-principal">
+    
+    <!-- Manija táctil estilo iOS con soporte gestual -->
+    <div class="apple-sheet-handle" onclick="ciclarTamanoPanel()" title="Desliza o toca para ajustar tamaño"></div>
+    
+    <!-- ENCABEZADO UNIFICADO CON CONTROLES NATIVOS -->
+    <div class="card-header" onclick="alTocarHeaderPanel(event)">
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h2 class="card-title" id="titulo-camion-card">Camión #1 • Santiago</h2>
+          <span class="apple-badge apple-badge-green" id="badge-estado">EN RUTA</span>
+        </div>
+        <p class="card-subtitle-full" style="font-size: 13px; color: var(--apple-text-secondary); margin-top: 2px;">
+          Placa: <strong id="camion-placa">L123456</strong> • <span id="sector-sub-summary">Los Jardines</span>
+        </p>
+        <!-- Resumen compacto mostrado en modo PEEK / MINIMIZADO -->
+        <div class="card-peek-summary" style="display: none; align-items: center; gap: 8px; margin-top: 3px; font-size: 12px; color: var(--apple-text-secondary);">
+          <span>Carga: <strong id="peek-carga-kg" style="color: var(--apple-text-primary);">0 kg</strong></span>
+          <span style="opacity: 0.4;">•</span>
+          <span style="color: var(--apple-blue); font-weight: 700;">Toca para expandir ↑</span>
+        </div>
+      </div>
+
+      <div class="card-header-actions" style="display: flex; align-items: center; gap: 6px;" onclick="event.stopPropagation()">
+        <!-- Selector rápido de sector / camión integrado en el panel -->
+        <select id="select-camion-inline" class="apple-select-mini" onchange="seleccionarCamion(parseInt(this.value))" title="Cambiar unidad">
+          <option value="1">#1 Jardines</option>
+          <option value="2">#2 Cienfuegos</option>
+          <option value="3">#3 Pekín</option>
+          <option value="4">#4 Reparto</option>
+        </select>
+
+        <!-- Botón para ajustar tamaño: Minimizar <-> Medio <-> Expandir -->
+        <button class="apple-icon-btn" onclick="ciclarTamanoPanel()" id="btn-size-toggle" data-apple-tooltip="Ajustar tamaño">⤢</button>
+
+        <!-- Botón para ocultar cuando el usuario quiera ver el mapa libre -->
+        <button class="apple-icon-btn" onclick="togglePanelPrincipal(false)" data-apple-tooltip="Ocultar para ver mapa libre">✕</button>
+      </div>
+    </div>
+
+    <!-- ==================== VISTA 1: MONITOREO EN VIVO ==================== -->
+    <div id="vista-monitoreo" class="vista-seccion">
+      <div class="card-body">
+        <!-- Medidor circular de carga tipo Apple Watch -->
+        <div class="gauge-container">
+          <svg class="ring-svg" viewBox="0 0 54 54">
+            <circle class="ring-bg" cx="27" cy="27" r="23" />
+            <circle class="ring-fill" id="ring-carga" cx="27" cy="27" r="23" />
+          </svg>
+          <div class="ring-text-container">
+            <span class="metric-label">Capacidad de Carga</span>
+            <div style="display: flex; align-items: baseline; gap: 4px;">
+              <span class="metric-value" id="val-carga-actual">0</span>
+              <span style="font-size: 13px; color: var(--apple-text-secondary);">/ <span id="val-capacidad-max">6,000</span> kg</span>
+            </div>
+            <span class="metric-sub" id="porcentaje-carga-texto">0% Ocupado</span>
+          </div>
+        </div>
+
+        <!-- Ficha del Chofer Asignado -->
+        <div style="background: rgba(255,255,255,0.75); border: 1px solid var(--apple-border-subtle); border-radius: var(--radius-md); padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--apple-text-primary); color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700;" id="chofer-avatar">P</div>
+          <div style="flex: 1;">
+            <p style="font-size: 15px; font-weight: 700; color: var(--apple-text-primary);" id="chofer-nombre">Pedro Martínez</p>
+            <p style="font-size: 12px; color: var(--apple-text-secondary);" id="chofer-ayudantes">Ayudantes: Juan Pérez, Luis Díaz</p>
+          </div>
+          <a id="chofer-telefono-link" href="tel:8095550101" data-apple-tooltip="Llamar al chofer" style="width: 36px; height: 36px; border-radius: 50%; background: rgba(52,199,89,0.15); color: var(--apple-green); display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 16px;">📞</a>
+        </div>
+
+        <!-- Métricas Rápidas -->
+        <div class="metric-grid">
+          <div class="metric-tile">
+            <span class="metric-label">Sector Asignado</span>
+            <span class="metric-value" style="font-size: 17px;" id="sector-actual-nombre">Los Jardines</span>
+            <span class="metric-sub" id="sector-sub-info">Circuito activo</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Simulador GPS</span>
+            <span class="metric-value" style="font-size: 17px;" id="sim-status-texto">Activo</span>
+            <span class="metric-sub" style="color: var(--apple-blue); cursor: pointer;" onclick="toggleSimulacion()">Pausar / Reanudar</span>
+          </div>
+        </div>
+
+        <!-- Controles Rápidos de Simulación -->
+        <div class="sim-controls-bar">
+          <button class="sim-btn" onclick="controlarSim('pausar')" data-apple-tooltip="Pausar movimiento GPS">⏸ Pausar</button>
+          <button class="sim-btn" onclick="controlarSim('reanudar')" data-apple-tooltip="Reanudar simulación">▶ Seguir</button>
+          <button class="sim-btn" onclick="cambiarVelocidadSim(2.0)" data-apple-tooltip="Doble velocidad">⚡ 2x</button>
+          <button class="sim-btn" onclick="controlarSim('toggle_retraso')" data-apple-tooltip="Simular congestión">⚠️ Tráfico</button>
+          <button class="sim-btn" onclick="confirmarReinicioSim()" data-apple-tooltip="Volver a Base Central">🔄 Origen</button>
+        </div>
+
+        <!-- Botones de Acción -->
+        <button class="btn-apple btn-apple-primary" onclick="cambiarVista('optimizador')">
+          ⚡ Optimizar Ruta con Dijkstra & Mochila
+        </button>
+
+        <button class="btn-apple btn-apple-secondary" onclick="abrirModalReporte()">
+          🚨 Reportar Basura Acumulada
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== VISTA 2: OPTIMIZADOR LOGÍSTICO ==================== -->
+    <div id="vista-optimizador" class="vista-seccion" style="display: none;">
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>Capacidad de Carga (kg):</span>
+            <strong id="label-capacidad-slider" style="color: var(--apple-blue);">6,000 kg</strong>
+          </div>
+          <input type="range" class="apple-range" id="input-capacidad" min="3000" max="8000" step="500" value="6000" oninput="actualizarSlider(this.value)">
+          <span style="font-size: 11px; color: var(--apple-text-secondary);">El Algoritmo de la Mochila seleccionará automáticamente los sectores óptimos sin sobrepasar este peso.</span>
+        </div>
+
+        <button class="btn-apple btn-apple-primary" id="btn-calcular-optimizacion" onclick="ejecutarOptimizacion()">
+          ⚡ Calcular Ruta Óptima desde la Base
+        </button>
+
+        <!-- SKELETON LOADER DURANTE EL CÁLCULO -->
+        <div id="skeleton-optimizacion" style="display: none; flex-direction: column; gap: 12px;">
+          <div class="skeleton-box skeleton-text lg"></div>
+          <div class="skeleton-box skeleton-text md"></div>
+          <div class="metric-grid">
+            <div class="metric-tile"><div class="skeleton-box skeleton-text sm"></div><div class="skeleton-box skeleton-text md"></div></div>
+            <div class="metric-tile"><div class="skeleton-box skeleton-text sm"></div><div class="skeleton-box skeleton-text md"></div></div>
+            <div class="metric-tile"><div class="skeleton-box skeleton-text sm"></div><div class="skeleton-box skeleton-text md"></div></div>
+            <div class="metric-tile"><div class="skeleton-box skeleton-text sm"></div><div class="skeleton-box skeleton-text md"></div></div>
+          </div>
+        </div>
+
+        <!-- Resultados de la Optimización -->
+        <div id="contenedor-resultados-opt" style="display: none; flex-direction: column; gap: 14px;">
+          <div style="background: rgba(52, 199, 89, 0.12); border: 1px solid rgba(52, 199, 89, 0.35); border-radius: var(--radius-md); padding: 14px 16px;">
+            <p style="font-size: 14px; font-weight: 700; color: #1E6B34;" id="opt-mensaje-resumen">¡Ruta Óptima Calculada!</p>
+            <p style="font-size: 12px; color: #2E5939; margin-top: 4px;" id="opt-detalle-mochila">Sectores seleccionados por máxima prioridad sanitaria.</p>
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric-tile">
+              <span class="metric-label">Distancia Optimizada</span>
+              <span class="metric-value" id="res-distancia">0.0 km</span>
+              <span class="metric-sub" id="res-ahorro-km">▼ 26% menos trayecto</span>
+            </div>
+            <div class="metric-tile">
+              <span class="metric-label">Tiempo Estimado</span>
+              <span class="metric-value" id="res-tiempo">0 min</span>
+              <span class="metric-sub" style="color: var(--apple-blue);">Con recolección</span>
+            </div>
+            <div class="metric-tile">
+              <span class="metric-label">Diésel Ahorrado</span>
+              <span class="metric-value" id="res-diesel">0 gal</span>
+              <span class="metric-sub" id="res-dinero-dop">RD$ 0.00 ahorrados</span>
+            </div>
+            <div class="metric-tile">
+              <span class="metric-label">Reducción CO2</span>
+              <span class="metric-value" id="res-co2">0 kg</span>
+              <span class="metric-sub">Impacto ecológico</span>
+            </div>
+          </div>
+
+          <button class="btn-apple btn-apple-green" onclick="cambiarVista('chofer')">
+            🚚 Enviar al Chofer (Ver Hoja de Ruta)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== VISTA 3: MODO CHOFER (CARPLAY) ==================== -->
+    <div id="vista-chofer" class="vista-seccion" style="display: none;">
+      <div class="card-body">
+        <div class="driver-next-card">
+          <div class="driver-badge">
+            <span class="pulse-dot"></span>
+            PRÓXIMA PARADA
+          </div>
+          <h3 class="driver-target-title" id="driver-proxima-nombre">Base Central de Operaciones</h3>
+          <p class="driver-target-action" id="driver-proxima-accion">Salida programada hacia los sectores asignados.</p>
+
+          <div class="driver-stats-strip">
+            <div class="driver-strip-item">
+              <span>Distancia Tramo</span>
+              <strong id="driver-proxima-dist">0.0 km</strong>
+            </div>
+            <div class="driver-strip-item">
+              <span>Tiempo Estimado</span>
+              <strong id="driver-proxima-tiempo">0 min</strong>
+            </div>
+            <div class="driver-strip-item">
+              <span>Carga a bordo</span>
+              <strong id="driver-proxima-carga">0 kg</strong>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-apple btn-apple-green" style="padding: 16px 22px; font-size: 16px;" onclick="completarParadaChofer()">
+          ✓ Marcar Parada como Completada
+        </button>
+
+        <h4 style="font-size: 14px; font-weight: 700; color: var(--apple-text-primary); margin-top: 4px;">Itinerario Completo del Circuito</h4>
+        
+        <div class="stop-list" id="lista-paradas-itinerario">
+          <p style="font-size: 13px; color: var(--apple-text-secondary); text-align: center; padding: 20px;">
+            Presiona "Optimizar" en la barra inferior para calcular la hoja de ruta con Dijkstra y Mochila.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== VISTA 4: EXPLICACIÓN DE ALGORITMOS ==================== -->
+    <div id="vista-algoritmos" class="vista-seccion" style="display: none;">
+      <div class="card-body">
+        <!-- Tarjeta Dijkstra -->
+        <div class="algo-explainer-card">
+          <div class="algo-title-bar">
+            <div class="algo-icon-box algo-icon-dijkstra">🛣️</div>
+            <div>
+              <h3 class="algo-name">Algoritmo de Dijkstra ("Distra")</h3>
+              <span style="font-size: 11px; color: var(--apple-text-secondary);">Caminos Mínimos en Grafos Viales</span>
+            </div>
+          </div>
+          <p class="algo-desc">
+            Modela la red vial de Santiago como un grafo donde cada intersección es un vértice y cada vía una arista ponderada. Con una cola de prioridad Min-Heap calcula la ruta de menor kilometraje y tiempo.
+          </p>
+          <div class="algo-formula">
+            d(v) = min( d(v), d(u) + peso(u, v) )
+          </div>
+        </div>
+
+        <!-- Tarjeta Mochila -->
+        <div class="algo-explainer-card">
+          <div class="algo-title-bar">
+            <div class="algo-icon-box algo-icon-mochila">🎒</div>
+            <div>
+              <h3 class="algo-name">Algoritmo de la Mochila (Knapsack 0/1)</h3>
+              <span style="font-size: 11px; color: var(--apple-text-secondary);">Programación Dinámica</span>
+            </div>
+          </div>
+          <p class="algo-desc">
+            Maximiza la urgencia y quejas comunitarias atendidas sin que el peso total supere la capacidad de carga del camión (ej. 6,000 kg).
+          </p>
+          <div class="algo-formula">
+            DP[i][w] = max( DP[i-1][w], DP[i-1][w - w_i] + v_i )
+          </div>
+        </div>
+
+        <!-- Tarjeta Haversine -->
+        <div class="algo-explainer-card">
+          <div class="algo-title-bar">
+            <div class="algo-icon-box algo-icon-distancia">📐</div>
+            <div>
+              <h3 class="algo-name">Cálculo de Distancias (Haversine)</h3>
+              <span style="font-size: 11px; color: var(--apple-text-secondary);">Geodesia de Círculo Máximo</span>
+            </div>
+          </div>
+          <div class="algo-formula">
+            d = 2 · R · atan2(√a, √(1−a))
+          </div>
+        </div>
+
+        <button class="btn-apple btn-apple-primary" onclick="iniciarOnboarding(true)">
+          💡 Ver Tour Interactivo de Bienvenida
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================================
+       BARRA INFERIOR DE PESTAÑAS (ÚNICA BARRA DE NAVEGACIÓN)
+       ======================================================== -->
+  <nav class="apple-tab-bar" id="apple-tab-bar">
+    <button class="apple-tab-item active" id="tab-item-mapa" onclick="cambiarVista('monitoreo')">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+      <span class="apple-tab-label">Mapa</span>
+    </button>
+    <button class="apple-tab-item" id="tab-item-opt" onclick="cambiarVista('optimizador')">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      <span class="apple-tab-label">Optimizar</span>
+      <span class="apple-badge-count">IA</span>
+    </button>
+    <button class="apple-tab-item" id="tab-item-chofer" onclick="cambiarVista('chofer')">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      <span class="apple-tab-label">Chofer</span>
+    </button>
+    <button class="apple-tab-item" id="tab-item-reportar" onclick="abrirModalReporte()">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      <span class="apple-tab-label">Reportar</span>
+    </button>
+    <button class="apple-tab-item" id="tab-item-algo" onclick="cambiarVista('algoritmos')">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+      <span class="apple-tab-label">Tour</span>
+    </button>
+  </nav>
+
+  <!-- FAB (FLOATING ACTION BUTTON) CON SPEED DIAL -->
+  <div class="apple-fab-container" id="apple-fab-container">
+    <button class="apple-fab-main" id="btn-fab-main" onclick="toggleFAB()" data-apple-tooltip="Acciones rápidas">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+    </button>
+    <div class="apple-fab-menu">
+      <button class="apple-fab-btn" onclick="centrarCamionActivo()" data-apple-tooltip="Centrar camión en mapa">📍</button>
+      <button class="apple-fab-btn" onclick="cambiarVista('optimizador')" data-apple-tooltip="Optimizar ruta">⚡</button>
+      <button class="apple-fab-btn" onclick="cambiarVista('chofer')" data-apple-tooltip="Consola chofer">🚚</button>
+      <button class="apple-fab-btn" onclick="abrirModalReporte()" data-apple-tooltip="Reportar basura">🚨</button>
+      <button class="apple-fab-btn" onclick="iniciarOnboarding(true)" data-apple-tooltip="Ver Tour de bienvenida">💡</button>
+    </div>
+  </div>
+
+  <!-- MODAL GENERAL DE SISTEMA / ALERTA -->
+  <div class="apple-modal-overlay" id="modal-sistema" onclick="cerrarModalSistema(event)">
+    <div class="apple-modal-card" onclick="event.stopPropagation()">
+      <div class="apple-modal-icon" id="modal-sistema-icon">⚡</div>
+      <h3 class="apple-modal-title" id="modal-sistema-title">Título del Diálogo</h3>
+      <p class="apple-modal-body" id="modal-sistema-body">Mensaje descriptivo del sistema.</p>
+      <div class="apple-modal-actions">
+        <button class="btn-apple btn-apple-secondary" id="modal-sistema-btn-cancel" onclick="cerrarModalSistema()">Cancelar</button>
+        <button class="btn-apple btn-apple-primary" id="modal-sistema-btn-confirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARA REPORTAR INCIDENCIA CIUDADANA -->
+  <div class="apple-modal-overlay" id="modal-reporte" onclick="cerrarModalReporte(event)">
+    <div class="apple-modal-card" onclick="event.stopPropagation()" style="text-align: left;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h3 class="apple-modal-title" style="margin-bottom: 0;">Reportar Incidencia</h3>
+        <button class="apple-icon-btn" onclick="cerrarModalReporte()">✕</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--apple-text-secondary); margin-bottom: 16px;">
+        Tu reporte incrementará automáticamente la urgencia en el Algoritmo de la Mochila para la próxima ruta.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+        <label style="font-size: 12px; font-weight: 700; color: var(--apple-text-secondary);">Tipo de Incidencia</label>
+        <select id="tipo-reporte" style="padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--apple-border-subtle); background: #FFF; font-size: 14px; outline: none;">
+          <option value="no_paso">El camión no pasó por mi calle</option>
+          <option value="basura_acumulada">Basura acumulada en esquina</option>
+          <option value="contenedor_danado">Contenedor público desbordado</option>
+          <option value="horario_incumplido">Incumplimiento de horario</option>
+          <option value="otro">Otro problema</option>
+        </select>
+
+        <label style="font-size: 12px; font-weight: 700; color: var(--apple-text-secondary);">Descripción</label>
+        <textarea id="desc-reporte" rows="3" placeholder="Detalla la calle o punto de referencia en Santiago..." style="padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--apple-border-subtle); background: #FFF; font-size: 14px; outline: none; resize: none;"></textarea>
+      </div>
+
+      <div class="apple-modal-actions">
+        <button class="btn-apple btn-apple-secondary" onclick="cerrarModalReporte()">Cancelar</button>
+        <button class="btn-apple btn-apple-primary" onclick="enviarReporte()">Enviar Reporte</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE ONBOARDING KEYNOTE APPLE -->
+  <div class="apple-modal-overlay" id="modal-onboarding">
+    <div class="onboarding-card">
+      <div class="onboarding-slide active" id="slide-0">
+        <div class="onboarding-icon-banner">🌿</div>
+        <h3 class="onboarding-title">Bienvenido a EcoRuta RD</h3>
+        <p class="onboarding-desc">
+          Plataforma de optimización de recolección de residuos para <strong>Santiago de los Caballeros</strong>. Diseñada bajo las pautas de Apple Human Interface para máxima fluidez en tu computadora o celular.
+        </p>
+      </div>
+
+      <div class="onboarding-slide" id="slide-1">
+        <div class="onboarding-icon-banner">🛣️</div>
+        <h3 class="onboarding-title">Algoritmo Dijkstra ("Distra")</h3>
+        <p class="onboarding-desc">
+          Calcula el camino mínimo exacto en la red vial de Santiago entre la Base Operativa, los sectores urbanos y la planta de Rafey, reduciendo kilómetros y combustible diésel.
+        </p>
+      </div>
+
+      <div class="onboarding-slide" id="slide-2">
+        <div class="onboarding-icon-banner">🎒</div>
+        <h3 class="onboarding-title">Algoritmo de la Mochila (Knapsack)</h3>
+        <p class="onboarding-desc">
+          Prioriza qué sectores recolectar para maximizar la basura recogida sin exceder el peso límite del camión (kg) ni las horas de turno.
+        </p>
+      </div>
+
+      <div class="onboarding-slide" id="slide-3">
+        <div class="onboarding-icon-banner">🚛</div>
+        <h3 class="onboarding-title">Consola Chofer & Telemetría</h3>
+        <p class="onboarding-desc">
+          Navegación asistida paso a paso para el chofer, seguimiento GPS en vivo de la flota y reportes comunitarios directos desde la ciudadanía.
+        </p>
+      </div>
+
+      <div class="onboarding-dots">
+        <span class="onboarding-dot active" onclick="irASlide(0)"></span>
+        <span class="onboarding-dot" onclick="irASlide(1)"></span>
+        <span class="onboarding-dot" onclick="irASlide(2)"></span>
+        <span class="onboarding-dot" onclick="irASlide(3)"></span>
+      </div>
+
+      <div class="onboarding-nav">
+        <button class="btn-apple btn-apple-secondary" style="width: auto; padding: 10px 16px;" onclick="cerrarOnboarding()">Saltar</button>
+        <button class="btn-apple btn-apple-primary" id="btn-next-onboarding" style="width: auto; padding: 10px 24px;" onclick="siguienteSlide()">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       SCRIPTS Y LÓGICA DE MAPA, APIS Y NAVEGACIÓN
+       ======================================================== -->
+  <script>
+    // 1. INICIALIZACIÓN DEL MAPA LEAFLET
+    const mapa = L.map('mapa', {
+      zoomControl: false,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
+    }).setView([19.4530, -70.6970], 14);
+
+    const capaOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    });
+
+    const capaCarto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
+      maxZoom: 20,
+      attribution: '&copy; CARTO'
+    });
+
+    const capaSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: 'Esri, Maxar'
+    });
+
+    capaOSM.addTo(mapa);
+    let capaActual = capaOSM;
+
+    function forzarRedibujadoMapa() {
+      if (mapa) {
+        mapa.invalidateSize(true);
+      }
+    }
+    window.addEventListener('load', forzarRedibujadoMapa);
+    window.addEventListener('resize', forzarRedibujadoMapa);
+    setTimeout(forzarRedibujadoMapa, 100);
+    setTimeout(forzarRedibujadoMapa, 400);
+
+    function cambiarCapaMapa(tipo) {
+      document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+      mapa.removeLayer(capaActual);
+
+      if (tipo === 'osm') {
+        capaOSM.addTo(mapa);
+        capaActual = capaOSM;
+        document.getElementById('btn-layer-osm').classList.add('active');
+      } else if (tipo === 'carto') {
+        capaCarto.addTo(mapa);
+        capaActual = capaCarto;
+        document.getElementById('btn-layer-carto').classList.add('active');
+      } else if (tipo === 'satelite') {
+        capaSatelite.addTo(mapa);
+        capaActual = capaSatelite;
+        document.getElementById('btn-layer-satelite').classList.add('active');
+      }
+      mostrarAppleToast(`Capa de mapa: ${tipo.toUpperCase()}`, 'info');
+    }
+
+    // 2. CAPAS VECTORIALES Y MARCADORES
+    const grupoCamiones = L.layerGroup().addTo(mapa);
+    const grupoSectores = L.layerGroup().addTo(mapa);
+    const grupoRutasBase = L.layerGroup().addTo(mapa);
+    let polilineaOptimizada = null;
+
+    let camionSeleccionadoId = 1;
+    let marcadoresCamiones = {};
+    let datosCamionActual = null;
+    let indiceParadaChofer = 0;
+
+    function crearIconoCamion(esActivo) {
+      return L.divIcon({
+        html: `
+          <div class="truck-marker-icon ${esActivo ? 'active-truck' : ''}">
+            <div class="truck-radar"></div>
+            🚛
+          </div>
+        `,
+        className: '',
+        iconSize: [46, 46],
+        iconAnchor: [23, 23],
+      });
+    }
+
+    // 3. CARGA DE RUTAS Y SECTORES
+    async function cargarRutasYSectores() {
+      try {
+        const resRutas = await fetch('/api/rutas');
+        if (resRutas.ok) {
+          const rutas = await resRutas.json();
+          grupoRutasBase.clearLayers();
+
+          const colores = ['#34C759', '#0071E3', '#FF9500', '#AF52DE'];
+          rutas.forEach((r, idx) => {
+            const latlngs = r.coordenadas.map(p => [p.lat, p.lng]);
+            L.polyline(latlngs, {
+              color: colores[idx % colores.length],
+              weight: 3.5,
+              opacity: 0.45,
+              dashArray: '6, 8',
+            }).addTo(grupoRutasBase);
+          });
+        }
+
+        const resSec = await fetch('/api/sectores');
+        if (resSec.ok) {
+          const sectores = await resSec.json();
+          grupoSectores.clearLayers();
+
+          sectores.forEach(sec => {
+            let claseUrgencia = 'low';
+            if (sec.prioridad >= 80) claseUrgencia = 'high';
+            else if (sec.prioridad >= 65) claseUrgencia = 'med';
+
+            const pinIcon = L.divIcon({
+              html: `
+                <div class="sector-pin ${claseUrgencia}">
+                  <span>🗑️</span>
+                  <span>${sec.nombre}</span>
+                  <span style="opacity: 0.6; font-size: 10px;">${sec.basura_estimada_kg || 1500}kg</span>
+                </div>
+              `,
+              className: '',
+              iconSize: [120, 28],
+              iconAnchor: [60, 14],
+            });
+
+            if (sec.lat_centro && sec.lng_centro) {
+              const m = L.marker([sec.lat_centro, sec.lng_centro], { icon: pinIcon }).addTo(grupoSectores);
+              m.bindPopup(`
+                <div style="font-family: -apple-system, sans-serif; padding: 4px;">
+                  <strong style="font-size: 14px;">${sec.nombre}</strong><br>
+                  <span style="font-size: 12px; color: #666;">Basura Estimada: <strong>${sec.basura_estimada_kg || 1500} kg</strong></span><br>
+                  <span style="font-size: 12px; color: #666;">Prioridad Comunitaria: <strong>${sec.prioridad || 50}/100</strong></span><br>
+                  <span style="font-size: 12px; color: #666;">Reportes Activos: <strong>${sec.reportes_activos || 0}</strong></span>
+                </div>
+              `);
+            }
+          });
+        }
+
+        const baseIcon = L.divIcon({
+          html: `<div class="base-pin">🏢 Base Central Operativa</div>`,
+          className: '',
+          iconSize: [155, 28],
+          iconAnchor: [77, 14]
+        });
+        L.marker([19.4500, -70.7000], { icon: baseIcon }).addTo(grupoSectores);
+
+        const rafeyIcon = L.divIcon({
+          html: `<div class="rafey-pin">♻️ Planta / Vertedero Rafey</div>`,
+          className: '',
+          iconSize: [175, 28],
+          iconAnchor: [87, 14]
+        });
+        L.marker([19.4680, -70.7420], { icon: rafeyIcon }).addTo(grupoSectores);
+
+      } catch (e) {
+        console.error('Error al cargar capas base:', e);
+      }
+    }
+
+    // 4. ACTUALIZACIÓN DE TELEMETRÍA
+    async function actualizarTelemetria() {
+      try {
+        const res = await fetch('/api/camiones');
+        if (!res.ok) return;
+        const camiones = await res.json();
+
+        camiones.forEach(c => {
+          const esActivo = (c.id === camionSeleccionadoId);
+          if (!marcadoresCamiones[c.id]) {
+            const m = L.marker([c.lat, c.lng], { icon: crearIconoCamion(esActivo) }).addTo(grupoCamiones);
+            m.on('click', () => seleccionarCamion(c.id));
+            marcadoresCamiones[c.id] = m;
+          } else {
+            marcadoresCamiones[c.id].setLatLng([c.lat, c.lng]);
+            marcadoresCamiones[c.id].setIcon(crearIconoCamion(esActivo));
+          }
+
+          if (esActivo) {
+            datosCamionActual = c;
+            actualizarFichaCamion(c);
+          }
+        });
+      } catch (e) {
+        console.error('Error al actualizar camiones', e);
+      }
+    }
+
+    // SELECCIÓN DE CAMIÓN / SECTOR
+    function seleccionarCamion(id) {
+      camionSeleccionadoId = id;
+
+      // Actualizar chips de la barra superior
+      for (let i = 1; i <= 4; i++) {
+        const chip = document.getElementById(`chip-camion-${i}`);
+        if (chip) chip.classList.toggle('active', i === id);
+      }
+
+      // Sincronizar el dropdown interno de la tarjeta
+      const inlineSelect = document.getElementById('select-camion-inline');
+      if (inlineSelect) inlineSelect.value = id;
+
+      actualizarTelemetria();
+
+      if (marcadoresCamiones[id]) {
+        const pos = marcadoresCamiones[id].getLatLng();
+        mapa.flyTo(pos, 15, { duration: 1.0 });
+      }
+
+      // Si el panel estaba oculto, lo restauramos cómodamente
+      if (tamanoPanelActual === 'hidden') {
+        setTamanoPanel('mid');
+      }
+
+      mostrarAppleToast(`Camión #${id} seleccionado`, 'info');
+    }
+
+    function centrarCamionActivo() {
+      if (marcadoresCamiones[camionSeleccionadoId]) {
+        const pos = marcadoresCamiones[camionSeleccionadoId].getLatLng();
+        mapa.flyTo(pos, 16, { duration: 1.2 });
+        mostrarAppleToast(`Centrado en Camión #${camionSeleccionadoId}`, 'success');
+      }
+    }
+
+    function actualizarFichaCamion(c) {
+      const nombreSector = c.sector || 'Los Jardines';
+      document.getElementById('titulo-camion-card').textContent = `Camión #${c.id} • ${nombreSector}`;
+      document.getElementById('camion-placa').textContent = c.placa;
+      document.getElementById('sector-sub-summary').textContent = nombreSector;
+      document.getElementById('reloj-act').textContent = c.ultima_actualizacion || new Date().toLocaleTimeString();
+
+      const dot = document.getElementById('indicador-live');
+      const txtEstado = document.getElementById('texto-estado-camion');
+      const badge = document.getElementById('badge-estado');
+      const rescueText = document.getElementById('texto-rescue-pill');
+
+      if (rescueText) {
+        rescueText.textContent = `🚛 #${c.id} ${nombreSector} • Mostrar`;
+      }
+
+      if (c.estado === 'retrasado') {
+        dot.classList.add('retrasado');
+        txtEstado.textContent = `Camión #${c.id} • Retrasado`;
+        badge.textContent = 'RETRASADO';
+        badge.className = 'apple-badge apple-badge-amber';
+      } else {
+        dot.classList.remove('retrasado');
+        txtEstado.textContent = `Camión #${c.id} • ${nombreSector} (En Ruta)`;
+        badge.textContent = 'EN RUTA';
+        badge.className = 'apple-badge apple-badge-green';
+      }
+
+      const cargaActual = c.carga_actual_kg || 0;
+      document.getElementById('val-carga-actual').textContent = cargaActual.toLocaleString();
+      document.getElementById('val-capacidad-max').textContent = (c.capacidad_max_kg || 6000).toLocaleString();
+      
+      const peekCarga = document.getElementById('peek-carga-kg');
+      if (peekCarga) peekCarga.textContent = `${cargaActual.toLocaleString()} kg`;
+
+      const pct = c.porcentaje_carga || 0;
+      document.getElementById('porcentaje-carga-texto').textContent = `${pct}% Ocupado`;
+
+      const ring = document.getElementById('ring-carga');
+      const maxOffset = 157;
+      const offset = maxOffset - (maxOffset * pct / 100);
+      ring.style.strokeDashoffset = Math.max(0, offset);
+
+      if (pct > 85) ring.style.stroke = 'var(--apple-red)';
+      else if (pct > 60) ring.style.stroke = 'var(--apple-amber)';
+      else ring.style.stroke = 'var(--apple-green)';
+
+      if (c.chofer) {
+        document.getElementById('chofer-nombre').textContent = c.chofer.nombre || 'Chofer Asignado';
+        document.getElementById('chofer-ayudantes').textContent = 'Ayudantes: ' + (c.chofer.ayudantes || 'Sin ayudantes');
+        document.getElementById('chofer-avatar').textContent = (c.chofer.nombre || 'C').charAt(0);
+        if (c.chofer.telefono) {
+          document.getElementById('chofer-telefono-link').href = `tel:${c.chofer.telefono}`;
+        }
+      }
+
+      document.getElementById('sector-actual-nombre').textContent = nombreSector;
+    }
+
+    // 5. MOTOR DE OPTIMIZACIÓN
+    async function ejecutarOptimizacion() {
+      const btn = document.getElementById('btn-calcular-optimizacion');
+      const skeleton = document.getElementById('skeleton-optimizacion');
+      const resContainer = document.getElementById('contenedor-resultados-opt');
+
+      btn.textContent = 'Calculando con Dijkstra y Mochila...';
+      btn.style.opacity = '0.7';
+
+      skeleton.style.display = 'flex';
+      resContainer.style.display = 'none';
+
+      try {
+        const capacidad = parseInt(document.getElementById('input-capacidad').value);
+        const res = await fetch('/api/optimizar-ruta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            camion_id: camionSeleccionadoId,
+            capacidad_max_kg: capacidad
+          })
+        });
+
+        const respuesta = await res.json();
+        btn.textContent = '⚡ Calcular Ruta Óptima desde la Base';
+        btn.style.opacity = '1';
+
+        skeleton.style.display = 'none';
+
+        if (!res.ok) {
+          mostrarAppleToast(respuesta.error || 'Error al optimizar', 'error');
+          return;
+        }
+
+        const data = respuesta.datos;
+        resContainer.style.display = 'flex';
+        document.getElementById('res-distancia').textContent = `${data.resumen_optimizacion.distancia_optimizada_km} km`;
+        document.getElementById('res-ahorro-km').textContent = `▼ ${data.resumen_optimizacion.km_ahorrados} km (${data.resumen_optimizacion.porcentaje_ahorro_distancia}% ahorro)`;
+        document.getElementById('res-tiempo').textContent = data.resumen_optimizacion.tiempo_total_estimado;
+        document.getElementById('res-diesel').textContent = `${data.resumen_optimizacion.galones_combustible_ahorrados} gal`;
+        document.getElementById('res-dinero-dop').textContent = `RD$ ${data.resumen_optimizacion.dinero_ahorrado_dop.toLocaleString()} ahorrados`;
+        document.getElementById('res-co2').textContent = `${data.resumen_optimizacion.co2_ahorrado_kg} kg`;
+
+        document.getElementById('opt-detalle-mochila').textContent = data.mochila.explicacion;
+
+        if (polilineaOptimizada) mapa.removeLayer(polilineaOptimizada);
+
+        polilineaOptimizada = L.polyline(data.coordenadas_polilinea, {
+          color: '#0071E3',
+          weight: 6,
+          opacity: 0.9,
+          lineJoin: 'round',
+        }).addTo(mapa);
+
+        mapa.fitBounds(polilineaOptimizada.getBounds(), { padding: [50, 50] });
+
+        cargarItinerarioChofer(data.itinerario_chofer);
+        mostrarAppleToast('✓ Ruta óptima calculada con éxito', 'success');
+
+      } catch (e) {
+        skeleton.style.display = 'none';
+        btn.textContent = '⚡ Calcular Ruta Óptima desde la Base';
+        btn.style.opacity = '1';
+        console.error(e);
+        mostrarAppleToast('Error al conectar con el servidor', 'error');
+      }
+    }
+
+    // 6. CONSOLA CHOFER (CARPLAY)
+    function cargarItinerarioChofer(itinerario) {
+      const contenedor = document.getElementById('lista-paradas-itinerario');
+      contenedor.innerHTML = '';
+      indiceParadaChofer = 0;
+
+      itinerario.forEach((p, idx) => {
+        const item = document.createElement('div');
+        item.className = `stop-item ${idx === 0 ? 'active' : ''}`;
+        item.id = `stop-item-${idx}`;
+        item.innerHTML = `
+          <div class="stop-number">${idx}</div>
+          <div class="stop-info">
+            <span class="stop-name">${p.nombre}</span>
+            <span class="stop-detail">${p.accion} • ${p.distancia_tramo_km} km</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; color: var(--apple-text-secondary);">${p.tiempo_tramo_min}m</span>
+        `;
+        contenedor.appendChild(item);
+      });
+
+      actualizarTarjetaChofer(itinerario[0]);
+    }
+
+    function actualizarTarjetaChofer(parada) {
+      if (!parada) return;
+      document.getElementById('driver-proxima-nombre').textContent = parada.nombre;
+      document.getElementById('driver-proxima-accion').textContent = parada.accion;
+      document.getElementById('driver-proxima-dist').textContent = `${parada.distancia_tramo_km} km`;
+      document.getElementById('driver-proxima-tiempo').textContent = `${parada.tiempo_tramo_min} min`;
+      document.getElementById('driver-proxima-carga').textContent = `${(parada.carga_acumulada_kg || 0).toLocaleString()} kg`;
+    }
+
+    async function completarParadaChofer() {
+      try {
+        const res = await fetch('/api/chofer/siguiente-parada', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.error) {
+          mostrarAppleToast(data.error, 'warning');
+          return;
+        }
+
+        mostrarAppleToast(data.mensaje, 'success');
+
+        const itemPrev = document.getElementById(`stop-item-${indiceParadaChofer}`);
+        if (itemPrev) {
+          itemPrev.classList.remove('active');
+          itemPrev.classList.add('completed');
+        }
+
+        indiceParadaChofer++;
+        const itemNext = document.getElementById(`stop-item-${indiceParadaChofer}`);
+        if (itemNext) {
+          itemNext.classList.add('active');
+        }
+
+        if (data.proxima_parada) {
+          actualizarTarjetaChofer(data.proxima_parada);
+          mapa.panTo([data.proxima_parada.lat, data.proxima_parada.lng]);
+        } else {
+          document.getElementById('driver-proxima-nombre').textContent = '¡Ruta Finalizada!';
+          document.getElementById('driver-proxima-accion').textContent = 'Descarga en Rafey completada. Camión listo para descansar.';
+        }
+
+        actualizarTelemetria();
+      } catch (e) {
+        console.error(e);
+        mostrarAppleToast('Error al marcar parada.', 'error');
+      }
+    }
+
+    // 7. CONTROL DE SIMULACIÓN INTERACTIVO
+    async function controlarSim(accion) {
+      try {
+        const res = await fetch('/api/simulacion/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accion, camion_id: camionSeleccionadoId })
+        });
+        const data = await res.json();
+        mostrarAppleToast(data.mensaje || 'Comando aplicado', 'info');
+        actualizarTelemetria();
+      } catch (e) {
+        mostrarAppleToast('Error al enviar comando', 'error');
+      }
+    }
+
+    async function cambiarVelocidadSim(mult) {
+      await fetch('/api/simulacion/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'velocidad', multiplicador: mult })
+      });
+      mostrarAppleToast(`Velocidad de simulación: ${mult}x`, 'info');
+    }
+
+    async function toggleSimulacion() {
+      const estadoActual = document.getElementById('sim-status-texto').textContent;
+      if (estadoActual === 'Activo') {
+        await controlarSim('pausar');
+        document.getElementById('sim-status-texto').textContent = 'Pausado';
+      } else {
+        await controlarSim('reanudar');
+        document.getElementById('sim-status-texto').textContent = 'Activo';
+      }
+    }
+
+    function confirmarReinicioSim() {
+      abrirModalAlerta({
+        icono: '🔄',
+        titulo: '¿Reiniciar Simulación?',
+        mensaje: 'Todos los camiones volverán a su punto de origen en la Base Central de Operaciones.',
+        textoConfirmar: 'Reiniciar a Base',
+        onConfirmar: () => controlarSim('reiniciar')
+      });
+    }
+
+    // ========================================================
+    // 8. CONTROLADOR DE TAMAÑO Y GESTOS DEL PANEL (APPLE SHEET)
+    // ========================================================
+    let tamanoPanelActual = 'mid'; // 'peek', 'mid', 'full', 'hidden'
+
+    function setTamanoPanel(tamano) {
+      const panel = document.getElementById('panel-principal');
+      const rescueBtn = document.getElementById('btn-rescue-panel');
+      const iconResize = document.getElementById('btn-size-toggle');
+
+      panel.classList.remove('card-snap-peek', 'card-snap-mid', 'card-snap-full', 'card-snap-hidden');
+      tamanoPanelActual = tamano;
+
+      if (tamano === 'hidden') {
+        panel.classList.add('card-snap-hidden');
+        if (rescueBtn) rescueBtn.classList.add('visible');
+        mostrarAppleToast('🗺️ Panel minimizado (toca la cápsula para restaurar)', 'info');
+        return;
+      }
+
+      if (rescueBtn) rescueBtn.classList.remove('visible');
+      panel.classList.add(`card-snap-${tamano}`);
+
+      if (iconResize) {
+        if (tamano === 'full') iconResize.textContent = '⤡';
+        else iconResize.textContent = '⤢';
+      }
+
+      forzarRedibujadoMapa();
+    }
+
+    function ciclarTamanoPanel() {
+      if (tamanoPanelActual === 'hidden' || tamanoPanelActual === 'peek') {
+        setTamanoPanel('mid');
+      } else if (tamanoPanelActual === 'mid') {
+        setTamanoPanel('full');
+      } else {
+        setTamanoPanel('peek');
+      }
+    }
+
+    function togglePanelPrincipal(mostrar) {
+      if (mostrar === undefined) {
+        mostrar = (tamanoPanelActual === 'hidden');
+      }
+      if (mostrar) {
+        setTamanoPanel('mid');
+      } else {
+        setTamanoPanel('hidden');
+      }
+    }
+
+    function alTocarHeaderPanel(e) {
+      if (tamanoPanelActual === 'peek') {
+        setTamanoPanel('mid');
+      }
+    }
+
+    // Gestos táctiles de arrastre (Swipe Up / Swipe Down) para celulares
+    let touchStartY = 0;
+    let touchDiffY = 0;
+    const handleBar = document.querySelector('.apple-sheet-handle');
+    const headerBar = document.querySelector('.card-header');
+
+    [handleBar, headerBar].forEach(elem => {
+      if (!elem) return;
+      elem.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+        touchDiffY = 0;
+      }, { passive: true });
+
+      elem.addEventListener('touchmove', (e) => {
+        touchDiffY = e.touches[0].clientY - touchStartY;
+      }, { passive: true });
+
+      elem.addEventListener('touchend', () => {
+        if (touchDiffY < -45) {
+          // Deslizado hacia ARRIBA -> Expandir
+          if (tamanoPanelActual === 'peek') setTamanoPanel('mid');
+          else if (tamanoPanelActual === 'mid') setTamanoPanel('full');
+        } else if (touchDiffY > 45) {
+          // Deslizado hacia ABAJO -> Contraer
+          if (tamanoPanelActual === 'full') setTamanoPanel('mid');
+          else if (tamanoPanelActual === 'mid') setTamanoPanel('peek');
+          else if (tamanoPanelActual === 'peek') setTamanoPanel('hidden');
+        }
+      });
+    });
+
+    // ========================================================
+    // 9. NAVEGACIÓN DESDE LA BARRA INFERIOR (ÚNICA BARRA)
+    // ========================================================
+    let vistaActivaActual = 'monitoreo';
+
+    function cambiarVista(vistaId) {
+      document.querySelectorAll('.apple-tab-item').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.vista-seccion').forEach(v => v.style.display = 'none');
+
+      if (vistaId === 'monitoreo') {
+        document.getElementById('tab-item-mapa')?.classList.add('active');
+        document.getElementById('vista-monitoreo').style.display = 'block';
+
+        // Si ya estaba en monitoreo y vuelve a tocar Mapa, alterna entre peek y mid para ver mapa completo
+        if (vistaActivaActual === 'monitoreo') {
+          if (tamanoPanelActual === 'mid' || tamanoPanelActual === 'full') {
+            setTamanoPanel('peek');
+          } else {
+            setTamanoPanel('mid');
+          }
+        } else {
+          setTamanoPanel('mid');
+        }
+      } else if (vistaId === 'optimizador') {
+        document.getElementById('tab-item-opt')?.classList.add('active');
+        document.getElementById('vista-optimizador').style.display = 'block';
+        setTamanoPanel('full');
+      } else if (vistaId === 'chofer') {
+        document.getElementById('tab-item-chofer')?.classList.add('active');
+        document.getElementById('vista-chofer').style.display = 'block';
+        setTamanoPanel('full');
+      } else if (vistaId === 'algoritmos') {
+        document.getElementById('tab-item-algo')?.classList.add('active');
+        document.getElementById('vista-algoritmos').style.display = 'block';
+        setTamanoPanel('full');
+      }
+
+      vistaActivaActual = vistaId;
+      forzarRedibujadoMapa();
+    }
+
+    // Auto-ocultar sutil al interactuar con el mapa
+    let temporizadorNavegacionMapa = null;
+
+    mapa.on('movestart dragstart zoomstart', function() {
+      document.body.classList.add('mapa-interactuando');
+    });
+
+    mapa.on('moveend dragend zoomend', function() {
+      clearTimeout(temporizadorNavegacionMapa);
+      temporizadorNavegacionMapa = setTimeout(() => {
+        document.body.classList.remove('mapa-interactuando');
+      }, 1500);
+    });
+
+    // Tocar espacio vacío del mapa en celulares minimiza a peek para disfrutar el mapa
+    mapa.on('click', function(e) {
+      if (!e.originalEvent.target.closest('.leaflet-marker-icon, .sector-pin, .base-pin, .rafey-pin, .glass-panel, .top-bar-container, .apple-modal-overlay, .map-layer-switch, .apple-rescue-pill, .apple-tab-bar, .apple-fab-container')) {
+        if (tamanoPanelActual === 'mid' || tamanoPanelActual === 'full') {
+          setTamanoPanel('peek');
+        }
+      }
+    });
+
+    function actualizarSlider(val) {
+      document.getElementById('label-capacidad-slider').textContent = `${parseInt(val).toLocaleString()} kg`;
+    }
+
+    // ========================================================
+    // TOAST NOTIFICACIONES APPLE
+    // ========================================================
+    function mostrarAppleToast(mensaje, tipo = 'info', duracion = 3000) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `apple-toast-item ${tipo}`;
+
+      let icono = 'ℹ️';
+      if (tipo === 'success') icono = '✓';
+      if (tipo === 'warning') icono = '⚠️';
+      if (tipo === 'error') icono = '✕';
+
+      toast.innerHTML = `
+        <div class="apple-toast-icon">${icono}</div>
+        <span>${mensaje}</span>
+        <span class="apple-toast-close">✕</span>
+      `;
+
+      toast.onclick = () => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.remove(), 350);
+      };
+
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('visible'), 20);
+
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.classList.remove('visible');
+          setTimeout(() => toast.remove(), 350);
+        }
+      }, duracion);
+    }
+
+    function mostrarToast(msg) {
+      mostrarAppleToast(msg, 'info');
+    }
+
+    // ========================================================
+    // MODAL ALERTA & CONFIRMACIONES
+    // ========================================================
+    let callbackConfirmarModal = null;
+
+    function abrirModalAlerta({ icono = 'ℹ️', titulo, mensaje, textoConfirmar = 'Aceptar', onConfirmar = null, textoCancelar = 'Cancelar' }) {
+      document.getElementById('modal-sistema-icon').textContent = icono;
+      document.getElementById('modal-sistema-title').textContent = titulo;
+      document.getElementById('modal-sistema-body').textContent = mensaje;
+      document.getElementById('modal-sistema-btn-confirm').textContent = textoConfirmar;
+      document.getElementById('modal-sistema-btn-cancel').textContent = textoCancelar;
+      callbackConfirmarModal = onConfirmar;
+
+      document.getElementById('modal-sistema-btn-confirm').onclick = () => {
+        if (callbackConfirmarModal) callbackConfirmarModal();
+        cerrarModalSistema();
+      };
+
+      document.getElementById('modal-sistema').classList.add('active');
+    }
+
+    function cerrarModalSistema(e) {
+      if (e && e.target !== e.currentTarget && e.target.id !== 'modal-sistema-btn-cancel') return;
+      document.getElementById('modal-sistema').classList.remove('active');
+      callbackConfirmarModal = null;
+    }
+
+    // MODAL REPORTE CIUDADANO
+    function abrirModalReporte() {
+      document.getElementById('modal-reporte').classList.add('active');
+    }
+
+    function cerrarModalReporte(e) {
+      if (e && e.target !== e.currentTarget && !e.target.closest('.apple-icon-btn, .btn-apple-secondary')) return;
+      document.getElementById('modal-reporte').classList.remove('active');
+    }
+
+    async function enviarReporte() {
+      const tipo = document.getElementById('tipo-reporte').value;
+      const desc = document.getElementById('desc-reporte').value;
+
+      try {
+        const res = await fetch('/api/reportar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tipo, descripcion: desc })
+        });
+        const d = await res.json();
+        cerrarModalReporte();
+        mostrarAppleToast(d.mensaje || 'Reporte registrado exitosamente', 'success');
+        document.getElementById('desc-reporte').value = '';
+        cargarRutasYSectores();
+      } catch (e) {
+        mostrarAppleToast('Error al enviar el reporte.', 'error');
+      }
+    }
+
+    // ========================================================
+    // ONBOARDING (KEYNOTE SLIDES)
+    // ========================================================
+    let slideOnboardingActual = 0;
+    const totalSlides = 4;
+
+    function iniciarOnboarding(forzar = false) {
+      if (!forzar && localStorage.getItem('ecoruta_onboarding_visto') === 'true') {
+        return;
+      }
+      slideOnboardingActual = 0;
+      actualizarSlidesDOM();
+      document.getElementById('modal-onboarding').classList.add('active');
+    }
+
+    function irASlide(n) {
+      slideOnboardingActual = n;
+      actualizarSlidesDOM();
+    }
+
+    function siguienteSlide() {
+      if (slideOnboardingActual < totalSlides - 1) {
+        slideOnboardingActual++;
+        actualizarSlidesDOM();
+      } else {
+        cerrarOnboarding();
+      }
+    }
+
+    function actualizarSlidesDOM() {
+      for (let i = 0; i < totalSlides; i++) {
+        const slide = document.getElementById(`slide-${i}`);
+        if (slide) slide.classList.toggle('active', i === slideOnboardingActual);
+      }
+      document.querySelectorAll('.onboarding-dot').forEach((dot, idx) => {
+        dot.classList.toggle('active', idx === slideOnboardingActual);
+      });
+
+      const nextBtn = document.getElementById('btn-next-onboarding');
+      if (slideOnboardingActual === totalSlides - 1) {
+        nextBtn.textContent = '¡Comenzar!';
+      } else {
+        nextBtn.textContent = 'Siguiente →';
+      }
+    }
+
+    function cerrarOnboarding() {
+      localStorage.setItem('ecoruta_onboarding_visto', 'true');
+      document.getElementById('modal-onboarding').classList.remove('active');
+      mostrarAppleToast('¡Bienvenido a EcoRuta RD Santiago!', 'success');
+    }
+
+    // ========================================================
+    // FAB (SPEED DIAL)
+    // ========================================================
+    function toggleFAB() {
+      const fab = document.getElementById('apple-fab-container');
+      fab.classList.toggle('open');
+    }
+
+    document.addEventListener('click', (e) => {
+      const fab = document.getElementById('apple-fab-container');
+      if (fab && !fab.contains(e.target) && fab.classList.contains('open')) {
+        fab.classList.remove('open');
+      }
+    });
+
+    // ARRANQUE DE LA APLICACIÓN
+    cargarRutasYSectores();
+    actualizarTelemetria();
+    setInterval(actualizarTelemetria, 3000);
+
+    setTimeout(() => {
+      iniciarOnboarding(false);
+    }, 1200);
+  </script>
+</body>
+</html>
